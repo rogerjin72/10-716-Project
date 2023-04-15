@@ -2,9 +2,12 @@ import copy
 
 import torch
 import torch.nn as nn
-import utils.data_utils as du
-import utils.model_utils as mu
+import torch.optim as optim
 
+from utils.data_utils import get_mnist
+from utils.config import DATA_PATH, MODEL_PATH
+from utils.model_utils import ConvNet
+from scripts.train import train_loop
 from tqdm import tqdm
 
 
@@ -61,3 +64,17 @@ def train_loop(model, train_dataloader, test_dataloader, optimizer, epochs, earl
                 return best_model
 
     return model
+
+if __name__ == '__main__':
+    model = ConvNet()
+    train_set = get_mnist(DATA_PATH)
+    test_set = get_mnist(DATA_PATH, train=False)
+
+    optimizer = optim.Adam(
+        model.parameters(),
+        lr=0.01,
+        betas=[0.9, 0.999]
+    )
+
+    model = train_loop(model, train_set, test_set, optimizer, epochs=100, early_stopping=3)
+    torch.save(model.state_dict(), MODEL_PATH / 'cnn.pt')
