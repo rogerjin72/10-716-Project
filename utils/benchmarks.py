@@ -7,11 +7,17 @@ from utils.config import *
 
 
 def preprocess_intermediate(data):
+    """
+    reshape intermediate layers for clustering
+    data = (n, d, x, y)
+    
+    output shape: (n * x * y, d)
+    """
     data = data.reshape(data.shape[:2] + (-1,))
     data = data.transpose(-1, -2).reshape(-1, 64)
     return data.numpy()
 
-
+ 
 def get_pca(data, k=10):
     try:
         components = torch.load(DATA_PATH / 'pca.pt')
