@@ -4,7 +4,9 @@ import torch.nn.functional as F
 
 
 def concept_sim(concepts):
+    concepts = F.normalize(concepts)
     m, _ = concepts.shape
+    
     # get similarities
     sims = concepts @ concepts.T
     # sum cross-terms
@@ -13,7 +15,9 @@ def concept_sim(concepts):
 
 
 def top_k_sim(concepts, inter, K):
+    concepts = F.normalize(concepts)
     m, _ = concepts.shape
+
     # get per concept similarities
     prod = torch.matmul(concepts, inter)
     prod = prod.transpose(0, 1).flatten(1)
