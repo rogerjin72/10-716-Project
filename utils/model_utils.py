@@ -66,7 +66,7 @@ class ConceptModel(nn.Module):
         self.n_concepts = n_concepts
         self.indim = 64
 
-        self.concepts = nn.Linear(self.indim, n_concepts)
+        self.concepts = nn.Linear(self.indim, n_concepts, bias=False)
         self.fc = nn.Linear(49 * n_concepts, 128)
         self.relu = nn.ReLU()
         self.beta = beta
@@ -81,3 +81,9 @@ class ConceptModel(nn.Module):
     
     def get_concepts(self):
         return self.concepts(torch.eye(64)).T
+    
+    def load_concepts(self, weights):
+        self.concepts.weight = nn.parameter.Parameter(weights)
+
+    def freeze_concepts(self):
+        self.concepts.requires_grad_(False)
