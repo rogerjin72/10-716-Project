@@ -19,11 +19,23 @@ def get_mnist(fp, train=True, shuffle=True, batch_size=64):
     return DataLoader(dataset, batch_size, shuffle=shuffle and train)
 
 
-def get_intermediate(fp, model, train=True):
+def get_mnist_image(index, fp, train=True):
+    mnist_transforms = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.1307,), (0.3081,)),
+        ]
+    )    
+    
+    dataset = torchvision.datasets.MNIST(fp, train, download=True, transform=mnist_transforms)
+    return dataset[index][0]
+
+
+def get_intermediate(fp, model, train=True, save=False):
     try:
         intermediate = torch.load(DATA_PATH / 'intermediate.pt')
     except FileNotFoundError:
-        dataloader = get_mnist(fp, train, False)
+        dataloader = get_mnist(fp, train, shuffle=False)
         intermediate = []
     
         model.eval()
@@ -31,6 +43,7 @@ def get_intermediate(fp, model, train=True):
             for x, _ in tqdm(dataloader):
                 intermediate.append(model.get_intermediate(x))
         intermediate = torch.concat(intermediate)
-        torch.save(intermediate, DATA_PATH / 'intermediate.pt')
+        if save:
+            torch.save(intermediate, DATA_PATH / 'intermediate.pt')
     
     return intermediate

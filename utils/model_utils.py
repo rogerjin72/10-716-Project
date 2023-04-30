@@ -80,7 +80,7 @@ class ConceptModel(nn.Module):
         return self.relu(x)
     
     def get_concepts(self):
-        return self.concepts(torch.eye(64)).T
+        return self.concepts(torch.eye(self.indim)).T
     
     def load_concepts(self, weights):
         self.concepts.weight = nn.parameter.Parameter(weights)
