@@ -7,7 +7,6 @@ import torch.optim as optim
 from utils.data_utils import get_mnist
 from utils.config import DATA_PATH, MODEL_PATH
 from utils.model_utils import ConvNet
-from train import train_loop
 from tqdm import tqdm
 
 

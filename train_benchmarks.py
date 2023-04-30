@@ -1,5 +1,6 @@
 import os
 import copy
+import json
 import torch
 
 from torch import nn
@@ -18,6 +19,7 @@ def train_fixed_concepts(model, concept_model, train_dataloader, test_dataloader
         t = 0
         min_val_loss = torch.Tensor([float("inf")])
         best_model = None
+        best_val_accuracy = 0
 
     classifier = model.linear
     loss_func = nn.CrossEntropyLoss()
@@ -76,18 +78,21 @@ def train_fixed_concepts(model, concept_model, train_dataloader, test_dataloader
             if val_loss < min_val_loss:
                 t = epoch
                 min_val_loss = val_loss
-                best_model = copy.deepcopy(model)
+                best_model = copy.deepcopy(concept_model)
+                best_val_accuracy = val_acc
 
             elif t + early_stopping <= epoch:
                 print(f'early stopping, retrieving model from epoch {t}')
-                return best_model
-    return model
+                return best_model, best_val_accuracy
+    return concept_model, best_val_accuracy
 
 
 if __name__ == "__main__":
+    kmeans_path = MODEL_PATH / 'kmeans'
+    pca_path = MODEL_PATH / 'pca'
     try:
-        os.mkdir(MODEL_PATH / 'kmeans')
-        os.mkdir(MODEL_PATH / 'pca')
+        os.mkdir(kmeans_path)
+        os.mkdir(pca_path)
     except FileExistsError:
         pass
 
@@ -96,7 +101,7 @@ if __name__ == "__main__":
     model = ConvNet()
     model.load_state_dict(torch.load(MODEL_PATH / 'cnn.pt'))
 
-    data = get_intermediate(DATA_PATH, model)
+    data = get_intermediate(DATA_PATH, model, save=True)
     data = preprocess_intermediate(data)
 
     pca = get_pca(data)
@@ -106,9 +111,11 @@ if __name__ == "__main__":
     for k in range(2, k_max+1):
         kmeans[k] = get_k_means(data, k)
 
-
     train_set = get_mnist(DATA_PATH)
     test_set = get_mnist(DATA_PATH, train=False)
+    
+    pca_accuracy = []
+    kmeans_accuracy = []
 
     for C in range(2, 11):
         concept_model = ConceptModel(C)
@@ -123,8 +130,9 @@ if __name__ == "__main__":
             betas=[0.9, 0.999]
         )
 
-        concept_model = train_fixed_concepts(model, concept_model, train_set, test_set, optimizer, epochs=100, early_stopping=1)
-        torch.save(model.state_dict(), MODEL_PATH / 'pca' / f'{C}_concept_model.pt')
+        concept_model, acc = train_fixed_concepts(model, concept_model, train_set, test_set, optimizer, epochs=3, early_stopping=1)
+        torch.save(concept_model.state_dict(), pca_path / f'{C}_concept_model.pt')
+        pca_accuracy.append(acc)
 
         concept_model = ConceptModel(C)
 
@@ -138,8 +146,11 @@ if __name__ == "__main__":
             betas=[0.9, 0.999]
         )
 
-        concept_model = train_fixed_concepts(model, concept_model, train_set, test_set, optimizer, epochs=100, early_stopping=1)
-        torch.save(model.state_dict(), MODEL_PATH / 'kmeans' / f'{C}_concept_model.pt')
+        concept_model, acc = train_fixed_concepts(model, concept_model, train_set, test_set, optimizer, epochs=3, early_stopping=1)
+        torch.save(concept_model.state_dict(), kmeans_path / f'{C}_concept_model.pt')
+        kmeans_accuracy.append(acc)
 
+    json.dump(pca_accuracy, open(pca_path / 'test_accuracies.json', 'w'))
+    json.dump(kmeans_accuracy, open(kmeans_path / 'test_accuracies.json', 'w'))
     os.remove(DATA_PATH / 'intermediate.pt')
 

@@ -1,4 +1,6 @@
+import os
 import copy
+import json
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -11,11 +13,12 @@ from utils.losses import top_k_sim, concept_sim
 from tqdm import tqdm
 
 
-def train_concepts(model, concept_model, train_dataloader, test_dataloader, optimizer, lambda1=0.1, lambda2=0.1, K=5, epochs=100, early_stopping=0):
+def train_concepts(model, concept_model, train_dataloader, test_dataloader, optimizer, lambda1=0.1, lambda2=0.1, K=5, epochs=3, early_stopping=0):
     if early_stopping:
         t = 0
         min_val_loss = torch.Tensor([float("inf")])
         best_model = None
+        best_val_accuracy = 0
 
     classifier = model.linear
     loss_func = nn.CrossEntropyLoss()
@@ -72,26 +75,36 @@ def train_concepts(model, concept_model, train_dataloader, test_dataloader, opti
 
         val_loss = val_loss / n
         val_acc = val_acc / n
-        print(f'Test loss: {val_loss}\n Test acc: {val_acc}')
+        print(f'Test loss: {val_loss}\nTest acc: {val_acc}')
 
         if early_stopping:
             if val_loss < min_val_loss:
                 t = epoch
                 min_val_loss = val_loss
-                best_model = copy.deepcopy(model)
+                best_model = copy.deepcopy(concept_model)
+                best_val_accuracy = val_acc
 
             elif t + early_stopping <= epoch:
                 print(f'early stopping, retrieving model from epoch {t}')
-                return best_model
-    return model
+                return best_model, best_val_accuracy
+            
+    return concept_model, best_val_accuracy
 
 
 if __name__ == '__main__':
+    try:
+        os.mkdir(MODEL_PATH / 'concept_aware')
+    except FileExistsError:
+        pass
+
     model = ConvNet()
     model.load_state_dict(torch.load(MODEL_PATH / 'cnn.pt'))
+    init_params = list(model.parameters())[0]
 
     train_set = get_mnist(DATA_PATH)
     test_set = get_mnist(DATA_PATH, train=False)
+
+    accuracies = []
 
     for C in range(2, 11):
         concept_model = ConceptModel(C)
@@ -102,5 +115,9 @@ if __name__ == '__main__':
             betas=[0.9, 0.999]
         )
 
-        concept_model = train_concepts(model, concept_model, train_set, test_set, optimizer, epochs=100, early_stopping=2)
-        torch.save(model.state_dict(), MODEL_PATH / f'{C}_concept_model.pt')
+        concept_model, acc = train_concepts(model, concept_model, train_set, test_set, optimizer, epochs=3, early_stopping=1)
+        assert (list(model.parameters())[0] == init_params).min()
+        accuracies.append(acc)
+        torch.save(concept_model.state_dict(), MODEL_PATH / 'concept_aware' / f'{C}_concept_model.pt')
+    
+    json.dump(accuracies, open(MODEL_PATH / 'concept_aware' / 'test_accuracies.json', 'w'))
